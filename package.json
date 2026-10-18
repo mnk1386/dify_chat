@@ -1,0 +1,38 @@
+{
+  "name": "dify-chat-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Persian RTL chat web application connected to a self-hosted Dify instance",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "npm -w server run dev",
+    "dev:web": "npm -w web run dev",
+    "build": "npm -w server run build && npm -w web run build",
+    "start": "node server/dist/index.js",
+    "test": "npm -w server run test",
+    "typecheck": "npm -w server run typecheck && npm -w web run typecheck"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.17",
+    "marked": "^12.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
+  }
+}
