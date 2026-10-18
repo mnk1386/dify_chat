@@ -12,7 +12,7 @@ import * as dify from '../dify/client';
 import { isAppError, AppError, DifyApiError } from '../utils/errors';
 import { logger } from '../utils/logger';
 import { upsertConversationIndex, cacheMessagePreview, logEvent } from '../db';
-import { assertConversationOwnership } from '../middleware/ownership';
+import { ensureConversationBelongsToUser } from '../middleware/ownership';
 import crypto from 'crypto';
 
 export const chatRouter = Router();
@@ -43,8 +43,6 @@ chatRouter.post('/send', requireCsrf, async (req: AuthedRequest, res: Response) 
   const user = req.user!;
   const difyUser = user.dify_user_id; // stable unguessable per-user id
 
-  if (body.conversationId && !assertConversationOwnership(req, res, () => undefined, body.conversationId)) return;
-
   // Idempotency: reject duplicate clientMsgId within a short window (prevents double sends).
   const dedupeKey = body.clientMsgId ? `idem:${user.id}:${body.clientMsgId}` : null;
   if (dedupeKey) {
@@ -53,7 +51,21 @@ chatRouter.post('/send', requireCsrf, async (req: AuthedRequest, res: Response) 
       return;
     }
     recentIds.add(dedupeKey);
-    setTimeout(() => recentIds.delete(dedupeKey), 60_000);
+    setTimeout(() => recentIds.delete(dedupeKey), 60_000).unref?.();
+  }
+
+  // Ownership check (async, verified against Dify + local index) BEFORE writing SSE headers.
+  if (body.conversationId) {
+    try {
+      await ensureConversationBelongsToUser(
+        body.conversationId, user.id, difyUser,
+        String(res.getHeader('x-request-id') || ''),
+      );
+    } catch (e) {
+      if (dedupeKey) recentIds.delete(dedupeKey); // allow retry after a rejected attempt
+      handle(res, e, req);
+      return;
+    }
   }
 
   const streamId = crypto.randomUUID();

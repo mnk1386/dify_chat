@@ -14,7 +14,8 @@ marked.setOptions({
   breaks: true,       // single newline -> <br> (chat-friendly)
 });
 
-const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$)/i;
+// Only absolute URLs with an approved scheme are allowed as link targets.
+const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto|tel):)/i;
 
 export function renderMarkdown(md: string): string {
   const rawHtml = marked.parse(md ?? '', { async: false }) as string;
