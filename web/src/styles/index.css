@@ -1,0 +1,89 @@
+/* Local fonts only — no external CDN at runtime (intranet requirement). */
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/vazirmatn-400.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB80-FBFF, U+FE80-FEFF, U+200C-200F, U+0020-007E, U+00A0-00FF;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/vazirmatn-700.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+FB80-FBFF, U+FE80-FEFF, U+200C-200F, U+0020-007E, U+00A0-00FF;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+
+html, body, #root { height: 100%; }
+
+body {
+  @apply antialiased bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100;
+}
+
+/* Font selection classes (set on <html> by settings hook) */
+.font-vazir { font-family: 'Vazirmatn', Tahoma, sans-serif; }
+.font-local { font-family: 'IRANSans', 'BNazanin', 'Vazirmatn', Tahoma, sans-serif; }
+.font-system { font-family: system-ui, 'Segoe UI', Tahoma, sans-serif; }
+
+/* Keep numbers/Latin readable inside Persian text */
+.num-ltr { direction: ltr; unicode-bidi: embed; }
+
+/* ---------- Markdown rendering ---------- */
+.md { @apply leading-8 text-[15px]; word-break: break-word; overflow-wrap: anywhere; }
+.md > *:first-child { margin-top: 0; }
+.md > *:last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4 { @apply font-bold mt-4 mb-2; }
+.md h1 { font-size: 1.35rem; } .md h2 { font-size: 1.2rem; } .md h3 { font-size: 1.08rem; }
+.md p { @apply my-2; }
+.md ul { list-style: disc; padding-inline-start: 1.5rem; @apply my-2 space-y-1; }
+.md ol { list-style: decimal; padding-inline-start: 1.5rem; @apply my-2 space-y-1; }
+.md blockquote { @apply border-r-4 border-brand-400 pr-3 my-2 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 rounded-r-lg py-2; }
+.md a { @apply text-brand-600 dark:text-brand-400 underline decoration-dotted underline-offset-4 hover:decoration-solid; }
+.md code:not(pre code) {
+  @apply bg-slate-200/70 dark:bg-slate-700/70 rounded px-1.5 py-0.5 text-[13px];
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  direction: ltr; unicode-bidi: embed; display: inline-block;
+}
+.md pre {
+  @apply relative my-3 rounded-xl overflow-auto bg-slate-900 text-slate-100 dark:bg-black/60 border border-slate-700/60;
+  direction: ltr; text-align: left; max-width: 100%;
+}
+.md pre code {
+  @apply block p-4 text-[13px] leading-6;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  background: transparent;
+}
+.md .code-copy-btn {
+  @apply absolute top-2 ltr:right-2 rtl:left-2 z-10 rounded-md bg-slate-700/80 hover:bg-slate-600 text-slate-100 text-xs px-2 py-1 transition-colors;
+  direction: rtl;
+}
+.md table { @apply my-3 border-collapse block max-w-full overflow-x-auto whitespace-normal; }
+.md th, .md td { @apply border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm; }
+.md th { @apply bg-slate-100 dark:bg-slate-800 font-bold; }
+.md hr { @apply my-4 border-slate-300 dark:border-slate-600; }
+.md img { @apply max-w-full rounded-lg my-2; }
+
+/* Blinking caret while streaming */
+.streaming-caret::after {
+  content: '▍'; @apply text-brand-500 animate-pulse;
+}
+
+/* Thin scrollbars */
+.nice-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.nice-scroll::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-600 rounded-full; }
+
+/* Focus visibility for keyboard accessibility */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-brand-500;
+}
+
+@media print { .no-print { display: none !important; } }
