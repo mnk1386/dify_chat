@@ -15,12 +15,19 @@ import { chatRouter } from './routes/chat';
 import { conversationsRouter } from './routes/conversations';
 import { appRouter } from './routes/app';
 import { adminRouter } from './routes/admin';
+import { requireAuth } from './middleware/auth';
 import { logger } from './utils/logger';
 
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', true);
+  // trust proxy: only in production, and only behind an explicitly configured
+  // trusted proxy CIDR list (never `true`, which would let anyone spoof XFF
+  // and bypass IP-based rate limiting).
+  if (process.env.NODE_ENV === 'production') {
+    const cidrs = (process.env.TRUST_PROXY_CIDRS || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (cidrs.length) app.set('trust proxy', cidrs);
+  }
 
   // Security headers with CSP tuned for an internal app that ships all assets locally.
   app.use(helmet({
@@ -69,10 +76,11 @@ export function createApp() {
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
   app.use('/api/auth', authRouter);
-  app.use('/api/chat', chatRouter);
-  app.use('/api/conversations', conversationsRouter);
-  app.use('/api/app', appRouter);
-  app.use('/api/admin', adminRouter);
+  // All remaining /api routers require a valid session (backend-enforced).
+  app.use('/api/chat', requireAuth, chatRouter);
+  app.use('/api/conversations', requireAuth, conversationsRouter);
+  app.use('/api/app', requireAuth, appRouter);
+  app.use('/api/admin', requireAuth, adminRouter);
 
   // 404 for unknown API endpoints
   app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found', message: 'مسیر موردنظر یافت نشد.' } }));

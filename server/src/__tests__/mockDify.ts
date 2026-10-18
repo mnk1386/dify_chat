@@ -28,7 +28,7 @@ export function createMockDify(apiKey = 'app-testkey') {
     const p = url.pathname.replace(/^\/v1/, '');
     let raw = '';
     req.on('data', (c) => (raw += c));
-    req.on('end', () => {
+    req.on('end', async () => {
       const body = raw ? safeJson(raw) : {};
 
       if (p === '/info' && req.method === 'GET') return json(200, { name: 'دستیار سازمانی', description: 'توضیح آزمایشی', tags: [] });
@@ -109,7 +109,11 @@ export function createMockDify(apiKey = 'app-testkey') {
       const sugMatch = p.match(/^\/messages\/([^/]+)\/suggested$/);
       if (sugMatch && req.method === 'GET') return json(200, { result: 'success', data: ['پیشنهاد ۱', 'پیشنهاد ۲'] });
       if (p === '/files/upload' && req.method === 'POST') {
-        return json(200, { id: cryptoRandom(), name: 'file.png', size: 1234, extension: 'png', mime_type: 'image/png', created_at: Date.now() });
+        // multipart body arrives raw; extract the filename from the part headers like a real server would
+        const nameMatch = raw.match(/filename="([^"]*)"/);
+        const fname = nameMatch ? nameMatch[1] : 'file.bin';
+        const ext = (fname.split('.').pop() || '').toLowerCase();
+        return json(200, { id: cryptoRandom(), name: fname, size: 1234, extension: ext, mime_type: 'application/octet-stream', created_at: Date.now() });
       }
       if (p === '/audio-to-text' && req.method === 'POST') return json(200, { text: 'متن گفتار', audio: null });
       if (p === '/text-to-audio' && req.method === 'POST') {
