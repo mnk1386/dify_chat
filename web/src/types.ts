@@ -153,6 +153,13 @@ export type StreamFrame =
   | StreamDeltaFrame | StreamEndFrame | StreamErrorFrame | AppErrorFrame
   | StreamEndFrameFinal | MessageFileFrame | WorkflowEventFrame;
 
+/** Narrow a StreamFrame union member by its `event` tag. */
+export function frameAs<F extends StreamFrame['event']>(frame: StreamFrame, event: F) {
+  return (frame as Extract<StreamFrame, { event: F }>).event === event
+    ? (frame as Extract<StreamFrame, { event: F }>)
+    : null;
+}
+
 /* ---------- Admin ---------- */
 
 export interface AdminSettings {

@@ -7,7 +7,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, chatApi, streamSend } from '../api/client';
-import type { RetrieverResource, StreamFrame, UiFile, UiMessage } from '../types';
+import type { StreamFrame, UiFile, UiMessage } from '../types';
+import { frameAs } from '../types';
 
 let seq = 0;
 const uid = () => `m${Date.now().toString(36)}_${(seq++).toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -51,38 +52,43 @@ export function useChat(onConversationChanged?: (convId: string | null) => void)
   }, [patch]);
 
   const handleFrame = useCallback((localId: string, frame: StreamFrame) => {
-    const f = frame as Record<string, unknown>;
-    const ev = String(f.event || '');
-    if (ev === 'delta') {
-      const answer = String(f.answer || '');
+    const ev = String(frame.event || '');
+    const delta = ev === 'delta' ? frameAs(frame, 'delta') : null;
+    const end = ev === 'end' ? frameAs(frame, 'end') : null;
+    const mfile = ev === 'message_file' ? frameAs(frame, 'message_file') : null;
+    const serr = ev === 'error' ? frameAs(frame, 'error') : null;
+    const aerr = ev === 'app_error' ? frameAs(frame, 'app_error') : null;
+
+    if (delta) {
+      const answer = String(delta.answer || '');
       if (!answer) return;
-      setMessages((ms) => ms.map((m) => (m.localId === localId ? { ...m, content: m.content + answer, status: 'streaming', difyMessageId: (f.message_id as string) || m.difyMessageId } : m)));
-      if (f.task_id) taskIdRef.current = String(f.task_id);
-      if (f.conversation_id && !convRef.current) { convRef.current = String(f.conversation_id); setConversationId(String(f.conversation_id)); onConversationChanged?.(convRef.current); }
-    } else if (ev === 'end') {
-      if (f.conversation_id && !convRef.current) { convRef.current = String(f.conversation_id); setConversationId(convRef.current); onConversationChanged?.(convRef.current); }
+      setMessages((ms) => ms.map((m) => (m.localId === localId ? { ...m, content: m.content + answer, status: 'streaming', difyMessageId: delta.message_id || m.difyMessageId } : m)));
+      if (delta.task_id) taskIdRef.current = String(delta.task_id);
+      if (delta.conversation_id && !convRef.current) { convRef.current = String(delta.conversation_id); setConversationId(String(delta.conversation_id)); onConversationChanged?.(convRef.current); }
+    } else if (end) {
+      if (end.conversation_id && !convRef.current) { convRef.current = String(end.conversation_id); setConversationId(convRef.current); onConversationChanged?.(convRef.current); }
       setMessages((ms) => ms.map((m) => (m.localId === localId
         ? {
             ...m,
-            difyMessageId: (f.message_id as string) || m.difyMessageId,
-            usage: (f.usage as Record<string, unknown>) || m.usage,
-            retrieverResources: (f.retriever_resources as RetrieverResource[]) || m.retrieverResources,
+            difyMessageId: end.message_id || m.difyMessageId,
+            usage: end.usage || m.usage,
+            retrieverResources: end.retriever_resources || m.retrieverResources,
           }
         : m)));
-    } else if (ev === 'message_file') {
-      const url = f.url as string | undefined;
-      const type = String(f.type || 'data');
+    } else if (mfile) {
+      const url = mfile.url;
+      const type = String(mfile.type || 'data');
       if (url) {
         setMessages((ms) => ms.map((m) => (m.localId === localId
           ? { ...m, files: [...(m.files || []), { id: uid(), name: 'فایل پیوست پاسخ', size: 0, mime: type, fileType: 'custom', uploading: false, progress: 100, previewUrl: type.startsWith('image/') ? url : undefined }] }
           : m)));
       }
-    } else if (ev === 'error') {
+    } else if (serr) {
       // Dify-level error event inside the stream
-      patch(localId, { status: 'error', errorText: String(f.message || 'خطا در پردازش پاسخ.'), retryable: true });
+      patch(localId, { status: 'error', errorText: String(serr.message || 'خطا در پردازش پاسخ.'), retryable: true });
       setIsStreaming(false); setActiveLocalId(null); inflightRef.current = false;
-    } else if (ev === 'app_error') {
-      patch(localId, { status: 'error', errorText: String(f.message || 'خطای سرویس.'), retryable: Boolean(f.retryable) });
+    } else if (aerr) {
+      patch(localId, { status: 'error', errorText: String(aerr.message || 'خطای سرویس.'), retryable: Boolean(aerr.retryable) });
       setIsStreaming(false); setActiveLocalId(null); inflightRef.current = false;
     }
     // stream_end / workflow_* events: no direct UI text effect (progress shown via indicator)
@@ -125,7 +131,7 @@ export function useChat(onConversationChanged?: (convId: string | null) => void)
       },
       {
         signal: controller.signal,
-        onFrame: (fr) => handleFrame(assistantLocalId, fr as StreamFrame),
+        onFrame: (fr) => handleFrame(assistantLocalId, fr as unknown as StreamFrame),
         onNetworkError: (err) => {
           patch(assistantLocalId, { status: 'error', errorText: err.message, retryable: true });
           setIsStreaming(false); setActiveLocalId(null); inflightRef.current = false;

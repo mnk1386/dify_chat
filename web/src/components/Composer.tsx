@@ -29,7 +29,10 @@ export function Composer({
   onSend, onStop, draft, onDraftChange,
 }: Props) {
   const text = draft;
-  const setText = onDraftChange;
+  const setText = useCallback((v: string) => onDraftChange(v), [onDraftChange]);
+  // Latest draft, readable from async callbacks (MediaRecorder.onstop) without stale closures.
+  const draftRef = useRef(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -85,7 +88,7 @@ export function Composer({
         try {
           const out = await chatApi.audioToText(blob);
           const spoken = (out.text || '').trim();
-          if (spoken) setText((prev) => (prev ? `${prev} ${spoken}` : spoken));
+          if (spoken) setText(draftRef.current ? `${draftRef.current} ${spoken}` : spoken);
           taRef.current?.focus();
         } catch (e) {
           setMicError(e instanceof Error ? e.message : t.chat.sttUnavailable);
