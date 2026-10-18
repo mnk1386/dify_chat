@@ -44,6 +44,15 @@ async function login(username: string, password: string) {
   return { cookie, csrf: me.body.csrfToken as string };
 }
 
+/** Extract SSE `data:` JSON frames from a supertest response that used a raw-buffering parse(). */
+function streamFrames(res: { body?: unknown; text?: string }): Array<Record<string, any>> {
+  const text = String((res as { body?: unknown }).body ?? res.text ?? '');
+  return text
+    .split('\n\n')
+    .filter((f) => f.startsWith('data: '))
+    .map((f) => JSON.parse(f.slice(6)));
+}
+
 describe('auth & sessions', () => {
   test('rejects wrong credentials with Persian error', async () => {
     const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'wrong' });
@@ -105,7 +114,8 @@ describe('chat streaming', () => {
         r.on('end', () => cb(null, data as never));
       });
     expect(res.status).toBe(200);
-    const text = String(res.text ?? '');
+    // superagent >=10 delivers the custom parser's value on `res.body` (`res.text` is unset there)
+    const text = String((res as { body?: unknown }).body ?? res.text ?? '');
     return text.split('\n\n').filter(f => f.startsWith('data: ')).map(f => f.slice(6));
   }
 
@@ -157,7 +167,7 @@ describe('chat streaming', () => {
     mock.setFailNextChat({ status: 500, code: 'internal_server_error' });
     const res = await request(app).post('/api/chat/send').set('Cookie', auth.cookie).set('X-CSRF-Token', auth.csrf)
       .send({ query: 'خطا', clientMsgId: 'err-1' }).buffer(true).parse((r, cb) => { let d = ''; r.on('data', c => d += c); r.on('end', () => cb(null, d as never)); });
-    const frames = String(res.text).split('\n\n').filter(f => f.startsWith('data: ')).map(f => JSON.parse(f.slice(6)));
+    const frames = streamFrames(res);
     const errFrame = frames.find(f => f.event === 'app_error');
     expect(errFrame).toBeTruthy();
     expect(typeof errFrame.message).toBe('string');
@@ -169,7 +179,7 @@ describe('chat streaming', () => {
     runtimeSettings.update({ difyBaseUrl: 'http://127.0.0.1:1/v1' }); // refused connection
     const res = await request(app).post('/api/chat/send').set('Cookie', auth.cookie).set('X-CSRF-Token', auth.csrf)
       .send({ query: 'قطعی شبکه', clientMsgId: 'net-1' }).buffer(true).parse((r, cb) => { let d = ''; r.on('data', c => d += c); r.on('end', () => cb(null, d as never)); });
-    const frames = String(res.text).split('\n\n').filter(f => f.startsWith('data: ')).map(f => JSON.parse(f.slice(6)));
+    const frames = streamFrames(res);
     const errFrame = frames.find(f => f.event === 'app_error');
     expect(errFrame).toBeTruthy();
     expect(errFrame.retryable).toBe(true);
@@ -186,7 +196,7 @@ describe('conversation management', () => {
     auth = await login('admin', 'AdminPass!23');
     const res = await request(app).post('/api/chat/send').set('Cookie', auth.cookie).set('X-CSRF-Token', auth.csrf)
       .send({ query: 'مکالمه آزمایشی', clientMsgId: 'c-1' }).buffer(true).parse((r, cb) => { let d = ''; r.on('data', c => d += c); r.on('end', () => cb(null, d as never)); });
-    const frames = String(res.text).split('\n\n').filter(f => f.startsWith('data: ')).map(f => JSON.parse(f.slice(6)));
+    const frames = streamFrames(res);
     convId = frames.find(f => f.event === 'end').conversation_id;
     msgId = frames.find(f => f.event === 'end').message_id;
   });
@@ -256,7 +266,7 @@ describe('multi-user isolation', () => {
 
     const res = await request(app).post('/api/chat/send').set('Cookie', a.cookie).set('X-CSRF-Token', a.csrf)
       .send({ query: 'محرمانه الف', clientMsgId: 'iso-1' }).buffer(true).parse((r, cb) => { let d = ''; r.on('data', c => d += c); r.on('end', () => cb(null, d as never)); });
-    const frames = String(res.text).split('\n\n').filter(f => f.startsWith('data: ')).map(f => JSON.parse(f.slice(6)));
+    const frames = streamFrames(res);
     const convId = frames.find(f => f.event === 'end').conversation_id;
 
     const attack = await request(app).get(`/api/conversations/${convId}/messages`).set('Cookie', b.cookie);
